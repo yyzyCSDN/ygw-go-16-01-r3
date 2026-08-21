@@ -16,14 +16,14 @@ func (m *Memory) Acquire(id, owner string, now time.Time, ttl time.Duration) (co
 	if delivery.State == core.DeliveryLeased && delivery.LeaseUntil.After(now) {
 		return core.Delivery{}, core.ErrLeaseConflict
 	}
-	previousEpoch := delivery.LeaseEpoch
-	previousOwner := delivery.LeaseOwner
 	delivery.State = core.DeliveryLeased
-	if previousEpoch > 0 && previousOwner != "" {
-		delivery.LeaseEpoch = previousEpoch
-	} else {
-		delivery.LeaseEpoch = previousEpoch + 1
-	}
+	// Every acquisition gets a fresh, strictly increasing epoch. This is the
+	// fencing token: any terminal transition (Complete/Retry/Dead) must present
+	// the exact epoch it was issued, so once the lease is reacquired the stale
+	// epoch held by a prior holder is rejected. Bumping unconditionally — rather
+	// than reusing the previous epoch when one exists — is what invalidates the
+	// old credentials after an expiry-driven reacquire.
+	delivery.LeaseEpoch = delivery.LeaseEpoch + 1
 	delivery.LeaseOwner = owner
 	delivery.LeaseUntil = now.Add(ttl)
 	m.deliveries[id] = delivery

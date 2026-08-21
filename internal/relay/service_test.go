@@ -36,3 +36,55 @@ func TestSubmitRollbackAndDeliver(t *testing.T) {
 		t.Fatalf("unexpected state %s", stored.State)
 	}
 }
+
+// TestLeaseFencingInvalidatesStaleEpoch proves the core lease-fencing
+// invariant: after a lease expires and is reacquired, the epoch from the
+// expired lease must no longer be accepted by Complete/Retry/Dead. Were the
+// epoch reused on reacquire (the bug), the stale credentials could mark the
+// same delivery complete a second time.
+func TestLeaseFencingInvalidatesStaleEpoch(t *testing.T) {
+	now := time.Unix(100, 0)
+	db := store.NewMemory()
+	event := core.Event{ID: "evt-f", Tenant: "acme", Endpoint: "https://sink", IdempotencyKey: "key-f", Payload: []byte("payload"), CreatedAt: now}
+	db.Reserve(event, "delivery-f", now)
+
+	// First acquisition: worker-a holds epoch 1, then lets the lease lapse.
+	acquired, err := db.Acquire("delivery-f", "worker-a", now, time.Minute)
+	if err != nil {
+		t.Fatalf("first acquire: %v", err)
+	}
+	staleEpoch := acquired.LeaseEpoch
+	if staleEpoch != 1 {
+		t.Fatalf("initial epoch = %d, want 1", staleEpoch)
+	}
+
+	// Lease lapses; the same worker reacquires after expiry. The new epoch
+	// must be strictly greater than the stale one.
+	reacquired, err := db.Acquire("delivery-f", "worker-a", now.Add(2*time.Minute), time.Minute)
+	if err != nil {
+		t.Fatalf("reacquire after expiry: %v", err)
+	}
+	if reacquired.LeaseEpoch <= staleEpoch {
+		t.Fatalf("epoch not bumped on reacquire: stale=%d new=%d", staleEpoch, reacquired.LeaseEpoch)
+	}
+
+	// The stale credentials from the first lease must be rejected: a
+	// completion attempt with the old epoch must fail, while the new epoch
+	// succeeds. This is what prevents a lapsed holder from double-completing.
+	if _, err := db.Complete("delivery-f", "worker-a", staleEpoch); !errors.Is(err, core.ErrLeaseConflict) {
+		t.Fatalf("stale epoch Complete: err=%v, want %v", err, core.ErrLeaseConflict)
+	}
+	if _, err := db.Retry("delivery-f", "worker-a", staleEpoch, now.Add(time.Second), errors.New("stale")); !errors.Is(err, core.ErrLeaseConflict) {
+		t.Fatalf("stale epoch Retry: err=%v, want %v", err, core.ErrLeaseConflict)
+	}
+
+	// The fresh epoch completes exactly once. A second complete with the same
+	// (now consumed) epoch is rejected because the delivery is no longer
+	// leased — the delivery cannot be completed twice.
+	if _, err := db.Complete("delivery-f", "worker-a", reacquired.LeaseEpoch); err != nil {
+		t.Fatalf("fresh epoch Complete: err=%v", err)
+	}
+	if _, err := db.Complete("delivery-f", "worker-a", reacquired.LeaseEpoch); !errors.Is(err, core.ErrLeaseConflict) {
+		t.Fatalf("second Complete: err=%v, want %v", err, core.ErrLeaseConflict)
+	}
+}
