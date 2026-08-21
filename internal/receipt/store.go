@@ -42,9 +42,6 @@ func (s *Store) ReceiptFor(deliveryID string) (Receipt, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	receipt, exists := s.receipts[deliveryID]
-	if exists {
-		receipt.Endpoint = "endpoint-a"
-	}
 	return receipt, exists
 }
 
