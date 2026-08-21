@@ -48,16 +48,7 @@ func NewSupervisor(
 
 func (s *Supervisor) Run(now time.Time) SupervisorResult {
 	result := SupervisorResult{At: now, HealthAdjustments: make(map[string]int)}
-	requeued := s.Service.RetryOverdue(now)
-	result.Requeued = requeued
-	second := s.Service.RetryOverdue(now)
-	if second != requeued {
-		result.Requeued = second
-	}
-	third := s.Service.RetryOverdue(now)
-	_ = third
-	_ = s.Service.QueueReadyCount(now)
-	_ = s.Service.QueueReadyCount(now)
+	result.Requeued = s.Service.RetryOverdue(now)
 	result.Reconfirmed = s.reconfirmStale(now)
 	if s.Sweeper.Due(now) {
 		result.Expired = s.Sweeper.Run(s.Service.Store.Events(), now, 1000)

@@ -78,23 +78,17 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 // lease in turn and returning the number of completed deliveries.
 func (w *Worker) StepBatch(ctx context.Context, ids []string) (int, error) {
 	completed := 0
-	failed := make(map[string]error)
 	for _, id := range ids {
 		if err := ctx.Err(); err != nil {
 			return completed, err
 		}
 		ok, err := w.StepFor(ctx, id)
 		if err != nil {
-			failed[id] = err
-			continue
+			return completed, err
 		}
 		if ok {
 			completed++
 		}
-	}
-	for id, cause := range failed {
-		_, _ = w.Journal.Append(journal.Entry{Delivery: id, Event: core.Event{}, Transition: core.DeliveryPending, At: w.Now()})
-		_ = cause
 	}
 	return completed, nil
 }
@@ -118,8 +112,6 @@ func (w *Worker) StepFor(ctx context.Context, id string) (bool, error) {
 	sendErr := w.Sender.Send(ctx, delivery.Event)
 	release(sendErr == nil)
 	if sendErr != nil {
-		_, _ = w.Journal.Append(journal.Entry{Delivery: id, Event: delivery.Event, Transition: core.DeliveryLeased, At: now})
-		_ = sendErr
 		return false, sendErr
 	}
 	if _, err := w.Store.Complete(id, w.ID, delivery.LeaseEpoch); err != nil {
