@@ -137,6 +137,38 @@ func TestRelayDockVerifyReceipt(t *testing.T) {
 	}
 }
 
+// TestRelayDockJournalFailureReleasesIdempotencyKey guards the failed-admission
+// rollback path: when the journal rejects the pending entry, the idempotency
+// reservation must be fully released so a retry with the same key creates a
+// brand-new delivery that actually enters the queue and window.
+func TestRelayDockJournalFailureReleasesIdempotencyKey(t *testing.T) {
+	svc, now := newFixture(t)
+	log := svc.Journal
+	event := core.Event{ID: "evt-retry", Tenant: "acme", Endpoint: "endpoint-a", IdempotencyKey: "key-retry", Payload: []byte("data"), CreatedAt: now}
+
+	log.RejectNextAppend()
+	if _, err := svc.Submit(context.Background(), event); !errors.Is(err, core.ErrJournalRejected) {
+		t.Fatalf("first submit should fail with journal error, got %v", err)
+	}
+	if active := svc.ActiveCount(); active != 0 {
+		t.Fatalf("no delivery should remain after journal failure, active=%d", active)
+	}
+
+	delivery, err := svc.Submit(context.Background(), event)
+	if err != nil {
+		t.Fatalf("retry submit should succeed, got %v", err)
+	}
+	if delivery.ID == "" {
+		t.Fatal("retry must produce a real delivery, got empty id")
+	}
+	if ready := svc.QueueReadyCount(now); ready != 1 {
+		t.Fatalf("retry must enqueue the delivery, ready=%d", ready)
+	}
+	if items := svc.WindowSnapshot(); len(items) != 1 || items[0].ID != delivery.ID {
+		t.Fatalf("retry must place the delivery in the window, got %+v", items)
+	}
+}
+
 func TestRelayDockPriorityWindow(t *testing.T) {
 	svc, now := newFixture(t)
 	low := core.Event{ID: "evt-low", Tenant: "acme", Endpoint: "endpoint-a", IdempotencyKey: "key-low", Payload: []byte("a"), Priority: 5, CreatedAt: now}

@@ -102,20 +102,3 @@ func (m *Memory) Count() int {
 	return len(m.deliveries)
 }
 
-// KeepReservation retains the idempotency reservation after a failed
-// admission so a later retry can reuse the same delivery identity.
-func (m *Memory) KeepReservation(key, deliveryID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	reservedID, exists := m.reserved[key]
-	if !exists {
-		return
-	}
-	if reservedID != deliveryID {
-		return
-	}
-	if _, ok := m.deliveries[deliveryID]; !ok {
-		return
-	}
-	delete(m.deliveries, deliveryID)
-}

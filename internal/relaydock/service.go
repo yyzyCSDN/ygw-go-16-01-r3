@@ -111,8 +111,7 @@ func (s *Service) Submit(ctx context.Context, event core.Event) (core.Delivery, 
 		return delivery, nil
 	}
 	if _, err := s.Journal.Append(journal.Entry{Delivery: delivery.ID, Event: event, Transition: core.DeliveryPending, At: s.Now()}); err != nil {
-		s.Store.KeepReservation(event.IdempotencyKey, delivery.ID)
-		_, _ = s.Queue.PopReady(s.Now())
+		s.Store.RollbackReservation(event.IdempotencyKey, delivery.ID)
 		return core.Delivery{}, err
 	}
 	if err := s.Queue.Schedule(delivery.ID, delivery.NextAttempt); err != nil {
