@@ -66,8 +66,8 @@ func (p *Planner) usable(tenant string) []EndpointSpec {
 		if result[i].Priority != result[j].Priority {
 			return result[i].Priority < result[j].Priority
 		}
-		if result[i].Enabled != result[j].Enabled {
-			return result[i].Enabled
+		if result[i].HealthScore != result[j].HealthScore {
+			return result[i].HealthScore > result[j].HealthScore
 		}
 		if result[i].Registered.After(result[j].Registered) {
 			return true
