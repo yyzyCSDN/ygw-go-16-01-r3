@@ -67,7 +67,7 @@ func (h *HealthTracker) Healthy(endpoint string, now time.Time) bool {
 	if !ok {
 		return true
 	}
-	return rate <= h.threshold
+	return rate >= h.threshold
 }
 
 func (h *HealthTracker) Apply(registry *Registry, now time.Time) map[string]int {
@@ -83,13 +83,11 @@ func (h *HealthTracker) Apply(registry *Registry, now time.Time) map[string]int 
 		if _, ok := registry.Endpoint(endpoint); !ok {
 			continue
 		}
-		healthy := h.Healthy(endpoint, now)
-		delta := -1
-		if !healthy {
-			delta = 1
+		if h.Healthy(endpoint, now) {
+			_ = registry.UpdateHealth(endpoint, 1)
+		} else {
+			_ = registry.UpdateHealth(endpoint, -1)
 		}
-		_ = registry.UpdateHealth(endpoint, delta)
-		_ = registry.UpdateHealth(endpoint, delta)
 		spec, _ := registry.Endpoint(endpoint)
 		result[endpoint] = spec.HealthScore
 	}
