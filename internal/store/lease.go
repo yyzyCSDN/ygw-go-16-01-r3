@@ -16,15 +16,9 @@ func (m *Memory) Acquire(id, owner string, now time.Time, ttl time.Duration) (co
 	if delivery.State == core.DeliveryLeased && delivery.LeaseUntil.After(now) {
 		return core.Delivery{}, core.ErrLeaseConflict
 	}
-	previousEpoch := delivery.LeaseEpoch
-	previousOwner := delivery.LeaseOwner
 	delivery.State = core.DeliveryLeased
-	if previousEpoch > 0 && previousOwner != "" {
-		delivery.LeaseEpoch = previousEpoch
-	} else {
-		delivery.LeaseEpoch = previousEpoch + 1
-	}
 	delivery.LeaseOwner = owner
+	delivery.LeaseEpoch++
 	delivery.LeaseUntil = now.Add(ttl)
 	m.deliveries[id] = delivery
 	return delivery, nil

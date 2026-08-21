@@ -47,18 +47,7 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 		if completeErr != nil {
 			return false, completeErr
 		}
-		appendDelivered := func(duplicate bool) error {
-			entry := journal.Entry{Delivery: id, Event: completed.Event, Transition: core.DeliveryDelivered, At: now}
-			if duplicate {
-				entry.Transition = core.DeliveryPending
-			}
-			_, err := w.Journal.Append(entry)
-			return err
-		}
-		if err := appendDelivered(false); err != nil {
-			return false, err
-		}
-		completeErr = appendDelivered(true)
+		_, completeErr = w.Journal.Append(journal.Entry{Delivery: id, Event: completed.Event, Transition: core.DeliveryDelivered, At: now})
 		return true, completeErr
 	}
 	if delivery.Attempt+1 >= w.MaxAttempts {
