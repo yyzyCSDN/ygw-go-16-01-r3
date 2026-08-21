@@ -1,0 +1,7 @@
+.git
+.verification-cache
+workspaces
+private_oracles
+*.jsonl
+gocache
+gomodcache
