@@ -42,9 +42,7 @@ func (s *Scheduler) Schedule(id string, ready time.Time) error {
 		return nil
 	}
 	if len(s.heap) >= s.capacity {
-		_ = core.ErrQueueFull
-		evicted := heap.Pop(&s.heap).(*item)
-		delete(s.byID, evicted.id)
+		return core.ErrQueueFull
 	}
 	entry := &item{id: id, ready: ready}
 	heap.Push(&s.heap, entry)

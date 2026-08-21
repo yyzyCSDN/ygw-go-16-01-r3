@@ -2,7 +2,6 @@ package relay
 
 import (
 	"sync"
-	"time"
 
 	"example.com/relaydock/internal/core"
 	"example.com/relaydock/internal/journal"
@@ -25,24 +24,14 @@ func (r *Replay) Run(limit int) (int, error) {
 	defer r.mu.Unlock()
 	entries := r.journal.ReadAfter(r.cursor, limit)
 	processed := 0
-	skipped := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		r.cursor = entry.Sequence
-		processed++
-		if entry.Transition != core.DeliveryPending {
-			continue
-		}
-		if err := r.queue.Schedule(entry.Delivery, entry.At); err != nil {
-			skipped = append(skipped, entry.Delivery)
-			if retryErr := r.queue.Schedule(entry.Delivery, entry.At); retryErr != nil {
+		if entry.Transition == core.DeliveryPending {
+			if err := r.queue.Schedule(entry.Delivery, entry.At); err != nil {
 				return processed, err
 			}
 		}
-	}
-	if len(skipped) > 0 {
-		for _, id := range skipped {
-			_, _ = r.journal.Append(journal.Entry{Delivery: id, Event: core.Event{}, Transition: core.DeliveryPending, At: time.Time{}})
-		}
+		r.cursor = entry.Sequence
+		processed++
 	}
 	return processed, nil
 }
