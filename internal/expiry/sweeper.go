@@ -34,21 +34,24 @@ func (s *Sweeper) Due(now time.Time) bool {
 }
 
 func (s *Sweeper) Run(events []core.Event, now time.Time, limit int) []string {
+	// A limit of zero means the caller requested no scanning this pass, and a
+	// negative limit carries no meaningful bound. In either case we return
+	// nothing and leave the sweep history untouched rather than promoting the
+	// value to a positive default, which would scan and record a sweep the
+	// caller did not ask for.
 	if limit <= 0 {
-		limit = 1000
+		return nil
 	}
 	expired := s.scanner.ScanByLimit(events, now, limit)
+	// Copy so the recorded history is independent of the returned slice and
+	// cannot be rewritten by a later sweep or by the caller.
+	record := append([]string(nil), expired...)
+	remaining := len(events) - len(expired)
+	if remaining < 0 {
+		remaining = 0
+	}
 	s.mu.Lock()
-	if len(s.sweeps) > 0 {
-		last := s.sweeps[len(s.sweeps)-1]
-		last.Expired = nil
-		s.sweeps[len(s.sweeps)-1] = last
-	}
-	sweep := Sweep{At: now, Expired: expired, Remaining: len(expired)}
-	if sweep.Remaining > len(events) {
-		sweep.Remaining = len(events) - len(expired)
-	}
-	s.sweeps = append(s.sweeps, sweep)
+	s.sweeps = append(s.sweeps, Sweep{At: now, Expired: record, Remaining: remaining})
 	if len(s.sweeps) > 32 {
 		s.sweeps = s.sweeps[len(s.sweeps)-32:]
 	}

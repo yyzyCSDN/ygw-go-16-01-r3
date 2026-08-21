@@ -64,8 +64,11 @@ func (s *Scanner) Protected() []string {
 // ScanByLimit returns expired event IDs up to a hard limit so a single sweep
 // cannot grow unboundedly.
 func (s *Scanner) ScanByLimit(events []core.Event, now time.Time, limit int) []string {
+	// A limit of zero means the caller wants no events this pass, so we never
+	// scan at all. A negative limit carries no meaningful bound and is treated
+	// the same way rather than being silently promoted to a positive default.
 	if limit <= 0 {
-		limit = 1
+		return nil
 	}
 	all := s.Scan(events, now)
 	if len(all) == 0 {
