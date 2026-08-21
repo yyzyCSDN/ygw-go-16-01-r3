@@ -42,9 +42,10 @@ func (s *Scheduler) Schedule(id string, ready time.Time) error {
 		return nil
 	}
 	if len(s.heap) >= s.capacity {
-		_ = core.ErrQueueFull
-		evicted := heap.Pop(&s.heap).(*item)
-		delete(s.byID, evicted.id)
+		// Queue is full: do not evict the earliest-queued delivery and do not
+		// push the new one. Leaving the queue untouched preserves FIFO order so
+		// the caller can surface the error and retry once a slot frees up.
+		return core.ErrQueueFull
 	}
 	entry := &item{id: id, ready: ready}
 	heap.Push(&s.heap, entry)
