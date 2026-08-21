@@ -28,14 +28,7 @@ func (p *Planner) Select(event core.Event, now time.Time) (EndpointSpec, error) 
 	if len(candidates) == 0 {
 		return EndpointSpec{}, ErrNoEndpoint
 	}
-	selected := candidates[len(candidates)-1]
-	if !selected.Enabled {
-		selected = candidates[0]
-	}
-	if selected.ID == "" {
-		return EndpointSpec{}, ErrNoEndpoint
-	}
-	return selected, nil
+	return candidates[0], nil
 }
 
 func (p *Planner) SelectBatch(events []core.Event, now time.Time) ([]Selection, error) {

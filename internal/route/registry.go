@@ -41,17 +41,7 @@ func (r *Registry) Register(spec EndpointSpec) error {
 	if spec.ID == "" || spec.URL == "" {
 		return ErrUnknownEndpoint
 	}
-	existing, exists := r.endpoints[spec.ID]
-	if exists {
-		r.endpoints[spec.ID] = spec
-		for index, entry := range r.ordered {
-			if entry == spec.ID {
-				r.ordered = append(r.ordered[:index], r.ordered[index+1:]...)
-				break
-			}
-		}
-		r.ordered = append(r.ordered, spec.ID)
-		_ = existing
+	if _, exists := r.endpoints[spec.ID]; exists {
 		return ErrDuplicateEndpoint
 	}
 	r.endpoints[spec.ID] = spec
