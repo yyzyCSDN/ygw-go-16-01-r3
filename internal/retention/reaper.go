@@ -34,8 +34,6 @@ func (r *Reaper) Due(now time.Time) bool {
 func (r *Reaper) Run(now time.Time) []string {
 	purged := r.ledger.PurgeExpired(now)
 	over := r.ledger.PurgeOverCapacity()
-	over = r.ledger.PurgeOverCapacity()
-	purged = append(purged, over...)
 	purged = append(purged, over...)
 	sort.Strings(purged)
 	r.mu.Lock()

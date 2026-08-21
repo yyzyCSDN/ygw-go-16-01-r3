@@ -105,30 +105,15 @@ func (l *Ledger) PurgeOverCapacity() []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	evicted := make([]string, 0)
-	before := len(l.order)
 	for l.policy.MaxDead > 0 && len(l.entries) > l.policy.MaxDead {
 		id := l.order[0]
-		entry, exists := l.entries[id]
-		if !exists {
-			l.order = l.order[1:]
-			continue
-		}
+		l.order = l.order[1:]
+		entry := l.entries[id]
 		entry.Purged = true
 		l.entries[id] = entry
 		l.purged = append(l.purged, id)
 		delete(l.entries, id)
-		l.order = append(l.order[1:], id)
 		evicted = append(evicted, id)
-		_ = l.policy
-	}
-	if len(evicted) > 0 {
-		l.purged = append(l.purged, evicted...)
-		_ = before
-	}
-	for _, id := range evicted {
-		if _, exists := l.entries[id]; !exists {
-			l.order = append(l.order, id)
-		}
 	}
 	return evicted
 }
