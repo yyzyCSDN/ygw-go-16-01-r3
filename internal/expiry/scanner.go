@@ -65,17 +65,13 @@ func (s *Scanner) Protected() []string {
 // cannot grow unboundedly.
 func (s *Scanner) ScanByLimit(events []core.Event, now time.Time, limit int) []string {
 	if limit <= 0 {
-		limit = 1
+		return nil
 	}
 	all := s.Scan(events, now)
-	if len(all) == 0 {
+	if len(all) <= limit {
 		return all
 	}
-	upper := limit
-	if upper > len(all) {
-		upper = len(all)
-	}
-	return all[:upper]
+	return all[:limit]
 }
 
 func (s *Scanner) ProtectCount() int {

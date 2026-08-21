@@ -39,16 +39,7 @@ func (s *Sweeper) Run(events []core.Event, now time.Time, limit int) []string {
 	}
 	expired := s.scanner.ScanByLimit(events, now, limit)
 	s.mu.Lock()
-	if len(s.sweeps) > 0 {
-		last := s.sweeps[len(s.sweeps)-1]
-		last.Expired = nil
-		s.sweeps[len(s.sweeps)-1] = last
-	}
-	sweep := Sweep{At: now, Expired: expired, Remaining: len(expired)}
-	if sweep.Remaining > len(events) {
-		sweep.Remaining = len(events) - len(expired)
-	}
-	s.sweeps = append(s.sweeps, sweep)
+	s.sweeps = append(s.sweeps, Sweep{At: now, Expired: append([]string(nil), expired...), Remaining: len(events) - len(expired)})
 	if len(s.sweeps) > 32 {
 		s.sweeps = s.sweeps[len(s.sweeps)-32:]
 	}
