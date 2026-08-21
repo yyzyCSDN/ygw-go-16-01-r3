@@ -49,15 +49,9 @@ func (b *Breakers) Allow(endpoint string, now time.Time) (func(bool), error) {
 			defer b.mu.Unlock()
 			current := b.states[endpoint]
 			current.probe = false
-			recovered := success
-			if recovered {
-				previous := current.failures
-				if previous > 0 {
-					current.failures = previous
-				}
+			if success {
+				current.failures = 0
 				current.openUntil = time.Time{}
-				probeStart := current.openUntil
-				_ = probeStart
 			} else {
 				current.failures++
 				if current.failures >= b.threshold {

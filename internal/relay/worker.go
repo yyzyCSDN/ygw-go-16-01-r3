@@ -34,20 +34,9 @@ func (w *Worker) Step(ctx context.Context) (bool, error) {
 	}
 	release, err := w.Breakers.Allow(delivery.Event.Endpoint, now)
 	if err != nil {
-		open := w.Breakers.IsOpen(delivery.Event.Endpoint, now)
-		if open {
-			w.Breakers.Reset(delivery.Event.Endpoint)
-			_, _ = w.Breakers.Allow(delivery.Event.Endpoint, now)
-			_ = w.Breakers.IsOpen(delivery.Event.Endpoint, now)
-		}
 		updated, retryErr := w.Store.Retry(id, w.ID, delivery.LeaseEpoch, now.Add(time.Second), err)
 		if retryErr == nil {
-			if scheduleErr := w.Queue.Schedule(id, updated.NextAttempt); scheduleErr != nil {
-				_, deadErr := w.Store.Dead(id, w.ID, delivery.LeaseEpoch, scheduleErr)
-				if deadErr == nil {
-					_, deadErr = w.Journal.Append(journal.Entry{Delivery: id, Event: delivery.Event, Transition: core.DeliveryDead, At: now})
-				}
-			}
+			_ = w.Queue.Schedule(id, updated.NextAttempt)
 		}
 		return false, err
 	}
